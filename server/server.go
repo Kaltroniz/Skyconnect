@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 
@@ -51,11 +52,15 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 // handleProxy is the HTTP handler for incoming external requests.
 // It uses the Host header (subdomain) to determine which client connection should receive the request.
 func handleProxy(w http.ResponseWriter, r *http.Request) {
-	// Assume the Host header contains the subdomain (e.g. your-app.skyconnect.com).
-	subdomain := r.Host
+	// Split the host and port.
+	host, _, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		// If there's an error (for example, no port provided), use r.Host as is.
+		host = r.Host
+	}
 
 	clientsMutex.Lock()
-	clientConn, ok := clients[subdomain]
+	clientConn, ok := clients[host]
 	clientsMutex.Unlock()
 
 	if !ok {
@@ -63,15 +68,15 @@ func handleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Forward the incoming HTTP request path to the client via WebSocket.
-	err := clientConn.WriteMessage(websocket.TextMessage, []byte(r.URL.String()))
+	// Forward the request path to the client over WebSocket.
+	err = clientConn.WriteMessage(websocket.TextMessage, []byte(r.URL.String()))
 	if err != nil {
 		log.Println("Error forwarding request to client:", err)
 		http.Error(w, "Error forwarding request", http.StatusInternalServerError)
 		return
 	}
 
-	// Wait for the client’s response (which is expected to come over the same WebSocket).
+	// Wait for the client’s response.
 	_, response, err := clientConn.ReadMessage()
 	if err != nil {
 		log.Println("Error reading response from client:", err)
@@ -79,7 +84,6 @@ func handleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write the response back to the external requester.
 	w.Write(response)
 }
 
