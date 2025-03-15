@@ -12,11 +12,14 @@ import (
 
 func main() {
 	// Define the subdomain you want this client to represent.
-	subdomain := "localhost:8080"
+	// This should match the DNS configuration on your public server.
+	subdomain := "localhost"
 
 	// Construct the WebSocket URL to connect to the SkyConnect server.
 	// Since everything is local, we use "localhost:8080".
 	serverURL := fmt.Sprintf("ws://localhost:8080/connect?subdomain=%s", url.QueryEscape(subdomain))
+	// If not local then use
+	// serverURL := fmt.Sprintf("ws://your-public-server-domain:8080/connect?subdomain=%s", url.QueryEscape(subdomain))
 
 	conn, _, err := websocket.DefaultDialer.Dial(serverURL, nil)
 	if err != nil {
